@@ -11,3 +11,6 @@ frontend/node_modules/
 frontend/dist/
 frontend/.env
 frontend/coverage/
+
+# infra/ - the real parameters file has secrets, only the .example version is tracked
+infra/main.parameters.json

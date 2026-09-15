@@ -1,0 +1,15 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentParameters.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "appName": { "value": "deskhand-variant" },
+    "azureOpenAiEndpoint": { "value": "https://<your-openai-resource>.openai.azure.com/" },
+    "azureOpenAiApiKey": { "value": "<fill in - do not commit>" },
+    "azureOpenAiChatDeployment": { "value": "gpt-4o-mini" },
+    "azureOpenAiEmbeddingDeployment": { "value": "text-embedding-3-small" },
+    "azureOpenAiEmbeddingDimensions": { "value": 1536 },
+    "azureSearchEndpoint": { "value": "https://<your-search-service>.search.windows.net" },
+    "azureSearchApiKey": { "value": "<fill in - do not commit>" },
+    "azureSearchIndexName": { "value": "company-docs" }
+  }
+}
