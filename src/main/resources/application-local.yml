@@ -1,0 +1,8 @@
+# Activated with SPRING_PROFILES_ACTIVE=local (see docker-compose.yml). spring-dotenv (see pom.xml)
+# loads a local .env file into the Spring Environment automatically, so the ${...} placeholders in
+# application.yml resolve from .env without any extra wiring here - this profile just turns on
+# more verbose logging for local development.
+logging:
+  level:
+    com.deskhand: DEBUG
+    org.springframework.ai: DEBUG

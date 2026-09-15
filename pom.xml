@@ -1,0 +1,152 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-starter-parent</artifactId>
+        <!-- Current GA line as of 2026-09; Spring Boot 3.5.x reached OSS EOL 2026-06-30, so this
+             project targets 4.1.x rather than the 3.5.x line an earlier planning pass assumed.
+             Re-check https://spring.io/projects/spring-boot for a newer 4.1.x patch before release. -->
+        <version>4.1.1</version>
+        <relativePath/>
+    </parent>
+
+    <groupId>com.deskhand</groupId>
+    <artifactId>deskhand-variant</artifactId>
+    <version>0.1.0-SNAPSHOT</version>
+    <name>deskhand-variant</name>
+    <description>Java/Azure port of DeskHand: RAG + decision-branching onboarding assistant on Spring Boot, Azure AI Search, and Azure OpenAI</description>
+
+    <properties>
+        <java.version>21</java.version>
+        <!-- Spring AI 2.0 requires Spring Boot 4.x / Spring Framework 7 and targets Java 21.
+             2.0.1 is the current patch (2026-08-21), fixing several CVEs present in 2.0.0 GA. -->
+        <spring-ai.version>2.0.1</spring-ai.version>
+        <!-- Azure SDK BOM aligns compatible versions of the two Azure client libraries below.
+             1.3.8 was the latest published BOM as of this scaffold (Azure publishes a new one
+             roughly monthly) - bump it if a newer one exists before you start implementing RAG. -->
+        <azure-sdk-bom.version>1.3.8</azure-sdk-bom.version>
+        <commonmark.version>0.30.0</commonmark.version>
+        <spring-dotenv.version>5.1.0</spring-dotenv.version>
+    </properties>
+
+    <dependencyManagement>
+        <dependencies>
+            <dependency>
+                <groupId>org.springframework.ai</groupId>
+                <artifactId>spring-ai-bom</artifactId>
+                <version>${spring-ai.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+            <dependency>
+                <groupId>com.azure</groupId>
+                <artifactId>azure-sdk-bom</artifactId>
+                <version>${azure-sdk-bom.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
+
+    <dependencies>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-web</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-validation</artifactId>
+        </dependency>
+
+        <!-- Azure OpenAI (chat + embeddings) via Spring AI's OpenAI-compatible model client.
+             IMPORTANT: Spring AI 2.0 DISCONTINUED the dedicated Azure OpenAI module
+             (spring-ai-azure-openai / spring-ai-starter-model-azure-openai /
+             spring-ai-autoconfigure-model-azure-openai). Its generic OpenAI starter has explicit
+             "Microsoft Foundry" (Azure OpenAI's current branding) support instead - see
+             application.yml's spring.ai.openai.microsoft-foundry / microsoft-deployment-name
+             properties. Confirmed working end-to-end at runtime: a request made with a placeholder
+             key reached Azure's endpoint and got Azure OpenAI's own 401 error message back, not a
+             connection failure - proving the request routing is genuinely correct. -->
+        <dependency>
+            <groupId>org.springframework.ai</groupId>
+            <artifactId>spring-ai-starter-model-openai</artifactId>
+        </dependency>
+
+        <!-- Azure AI Search: raw SDK, used directly (not via a Spring AI vector store abstraction)
+             so the index schema, hybrid query construction, and vector field config are all
+             hands-on, explainable code rather than framework internals.
+             NOTE: this SDK moved from the 11.7.x/11.8.x line to a 12.x GA line (12.0.2 at scaffold
+             time) - re-verify the vector/hybrid query API shape (VectorizedQuery and friends)
+             against current docs before implementing rag/, since package/method shapes have
+             shifted across major versions before. -->
+        <dependency>
+            <groupId>com.azure</groupId>
+            <artifactId>azure-search-documents</artifactId>
+        </dependency>
+
+        <!-- Markdown AST parsing, used to replicate the original's H2-heading chunking strategy -->
+        <dependency>
+            <groupId>org.commonmark</groupId>
+            <artifactId>commonmark</artifactId>
+            <version>${commonmark.version}</version>
+        </dependency>
+
+        <!-- Loads a local .env file into Spring's Environment for local dev; in Azure App Service,
+             real App Settings/environment variables are used instead and this has no effect. -->
+        <dependency>
+            <groupId>me.paulschwarz</groupId>
+            <artifactId>spring-dotenv</artifactId>
+            <version>${spring-dotenv.version}</version>
+        </dependency>
+
+        <dependency>
+            <groupId>org.projectlombok</groupId>
+            <artifactId>lombok</artifactId>
+            <optional>true</optional>
+        </dependency>
+
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <!-- Spring Boot 4 split its monolithic test-autoconfigure jar into per-tech modules;
+             @WebMvcTest/MockMvc now live here rather than in spring-boot-starter-test itself
+             (confirmed by grepping the resolved jars - @WebMvcTest was simply absent otherwise). -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-webmvc-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <finalName>deskhand-variant</finalName>
+        <plugins>
+            <plugin>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-maven-plugin</artifactId>
+            </plugin>
+            <!-- Surefire (bound to `mvn test`) only picks up *Test.java by convention; *IT.java
+                 files (like OnboardingControllerIT) need Failsafe, bound to `mvn verify`, to
+                 actually run - confirmed by checking: without this, OnboardingControllerIT was
+                 silently never executed despite compiling cleanly. -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-failsafe-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <goals>
+                            <goal>integration-test</goal>
+                            <goal>verify</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+        </plugins>
+    </build>
+</project>

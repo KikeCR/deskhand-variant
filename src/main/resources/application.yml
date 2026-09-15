@@ -1,0 +1,62 @@
+spring:
+  application:
+    name: deskhand-variant
+  ai:
+    openai:
+      # Spring AI 2.0 discontinued the dedicated Azure OpenAI module, but its generic OpenAI
+      # starter has explicit, first-class "Microsoft Foundry" (Azure OpenAI's current branding)
+      # support built in - confirmed by inspecting spring-ai-autoconfigure-model-openai's own
+      # spring-configuration-metadata.json rather than guessing: microsoft-foundry=true switches
+      # the underlying openai-java client into Azure's deployment-scoped URL + api-version mode,
+      # and microsoft-deployment-name supplies the deployment (which can differ from the base
+      # model name - see .env.example). CONFIRMED working end-to-end with a placeholder key: a
+      # real request reached Azure's endpoint and got back Azure OpenAI's own
+      # "invalid subscription key or wrong API endpoint... regional API endpoint" 401 - proving
+      # the request was correctly shaped for Azure, not routed as if to api.openai.com. Only a
+      # real key/deployment is needed to get actual completions.
+      base-url: ${AZURE_OPENAI_ENDPOINT:}
+      api-key: ${AZURE_OPENAI_API_KEY:}
+      microsoft-foundry: true
+      chat:
+        microsoft-deployment-name: ${AZURE_OPENAI_CHAT_DEPLOYMENT:gpt-4o-mini}
+      embedding:
+        microsoft-deployment-name: ${AZURE_OPENAI_EMBEDDING_DEPLOYMENT:text-embedding-3-small}
+        dimensions: ${AZURE_OPENAI_EMBEDDING_DIMENSIONS:1536}
+
+server:
+  port: 8080
+  # App Service default request timeout comfortably exceeds this - see README for the App
+  # Service vs. Azure Functions reasoning. Onboarding runs take ~15-40s (three sequential LLM
+  # calls plus retrieval), so keep this well above that.
+  tomcat:
+    connection-timeout: 120s
+
+# Every Azure-specific value is externalized here and sourced from environment variables (see
+# .env.example) - never hardcode an endpoint, key, or deployment name.
+deskhand:
+  azure-open-ai:
+    endpoint: ${AZURE_OPENAI_ENDPOINT:}
+    api-key: ${AZURE_OPENAI_API_KEY:}
+    # Azure OpenAI requires named *deployments* of a base model, not a raw model name like
+    # OpenAI's direct API - these must match deployment names you create in your Azure OpenAI
+    # resource, not the underlying base model names.
+    chat-deployment-name: ${AZURE_OPENAI_CHAT_DEPLOYMENT:gpt-4o-mini}
+    embedding-deployment-name: ${AZURE_OPENAI_EMBEDDING_DEPLOYMENT:text-embedding-3-small}
+  azure-search:
+    endpoint: ${AZURE_SEARCH_ENDPOINT:}
+    api-key: ${AZURE_SEARCH_API_KEY:}
+    index-name: ${AZURE_SEARCH_INDEX_NAME:company-docs}
+  onboarding:
+    # Matches the original's default n_results=4 for retrieval
+    retrieval-top-k: 4
+    # Matches the original Research agent's ">= 3 targeted searches" instruction
+    min-research-searches: 3
+    # Must match the Azure OpenAI embedding deployment's output size - text-embedding-3-small
+    # defaults to 1536. Verify against your actual deployment; a mismatch means recreating the
+    # Azure AI Search index. Kept in sync with spring.ai.openai.embedding.dimensions above via the
+    # same env var.
+    embedding-dimensions: ${AZURE_OPENAI_EMBEDDING_DIMENSIONS:1536}
+
+logging:
+  level:
+    com.deskhand: INFO
